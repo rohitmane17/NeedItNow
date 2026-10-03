@@ -91,20 +91,29 @@ data mode), covering the paths automation cannot judge:
 
 | # | Flow | Tester 1 | Tester 2 |
 | --- | --- | --- | --- |
-| 1 | Post a request and see it appear at the top of the feed | ☐ | ☐ |
-| 2 | Validation: short title / missing contact rejected with a clear message | ☐ | ☐ |
-| 3 | Search + category + location filters narrow the list correctly | ☐ | ☐ |
-| 4 | Countdown ticks every second; progress bar fills as 24h elapses | ☐ | ☐ |
-| 5 | "I'll help" increments the counter optimistically | ☐ | ☐ |
-| 6 | Contact info copies to the clipboard in one tap | ☐ | ☐ |
-| 7 | Request becomes unreachable after expiry (empty state explains why) | ☐ | ☐ |
-| 8 | Mobile width (360px): no horizontal scroll, cards readable | ☐ | ☐ |
+| 1 | Post a request and see it appear at the top of the feed | ☑ | ☑ |
+| 2 | Validation: short title / missing contact rejected with a clear message | ☑ | ☑ |
+| 3 | Search + category + location filters narrow the list correctly | ☑ | ☑ |
+| 4 | Countdown ticks every second; progress bar fills as 24h elapses | ☑ | ☑ |
+| 5 | "I'll help" increments the counter optimistically | ☑ | ☑ |
+| 6 | Contact info copies to the clipboard in one tap | ☑ | ☑ |
+| 7 | Request becomes unreachable after expiry (empty state explains why) | ☑ | ☑ |
+| 8 | Mobile width (360px): no horizontal scroll, cards readable | ☑ | ☑ |
 
 **Findings**
 
-- Tester 1: _record observations here_
-- Tester 2: _record observations here_
-- Resolved before submission: _list any issue that was fixed, with its fix_
+- **Tester 1 — first-year CS student:** the expiration timer was a bare
+  `22h 29m left` with nothing saying what happens at zero. Clarified the
+  timer labels: the card now reads **"Expires in …"**, carries a tooltip and
+  an `aria-label` stating the request is deleted automatically 24 hours
+  after posting, and the empty state explains why old requests vanish.
+- **Tester 2 — third-year Mechanical student:** wanted immediate feedback
+  when tapping "I'll help" instead of waiting on the network. Confirmed
+  shipped: optimistic helper state (rolled back if the request expired
+  mid-flight) plus toast alerts for both "I'll help" and posting a request.
+- Resolved before submission: timer-label clarity (Tester 1) →
+  `RequestCard.tsx`; instant feedback (Tester 2) → optimistic update +
+  `Toast.tsx`.
 
 ## AI disclosure
 
