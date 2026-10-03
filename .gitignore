@@ -30,6 +30,3 @@ dist-ssr
 
 # Vercel CLI local link (created by `vercel link`)
 .vercel/
-
-.vercel
-.env*

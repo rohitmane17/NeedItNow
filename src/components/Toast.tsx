@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { CheckCircle2, X } from 'lucide-react'
 
 export interface ToastMessage {
@@ -13,11 +13,21 @@ interface ToastProps {
 }
 
 export function Toast({ toast, onDismiss }: ToastProps) {
+  // Read the latest handler through a ref. The parent re-renders every second
+  // (the ticking expiry clock lives in useRequests), so an inline `onDismiss`
+  // changes identity every tick. Depending on it directly restarted the timer
+  // below once per second, so the toast never actually auto-dismissed.
+  const onDismissRef = useRef(onDismiss)
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  }, [onDismiss])
+
   useEffect(() => {
     if (!toast) return
-    const id = window.setTimeout(onDismiss, 4000)
+    const id = window.setTimeout(() => onDismissRef.current(), 4000)
     return () => window.clearTimeout(id)
-  }, [toast, onDismiss])
+    // Deps intentionally `[toast]` only — see comment above.
+  }, [toast])
 
   if (!toast) return null
 
