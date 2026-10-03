@@ -2,6 +2,10 @@
 
 A 24-hour request board for VIT Pune students — borrow an item, find a lab partner, grab notes before a deadline, or ask for an extra pair of hands. **Every request disappears exactly 24 hours after it is posted.**
 
+**Live demo:** https://needitnow-delta.vercel.app
+(deployed on Vercel in **Demo data** mode — it switches to live Supabase as
+soon as `VITE_SUPABASE_*` environment variables are set)
+
 **PRN #7 — "Forgetful"** is enforced in three places, not one:
 
 | Layer | Enforcement |
