@@ -129,9 +129,29 @@ to the same standard as hand-written code: no placeholders, no skipped logic.
 
 ## Deploying to Vercel
 
-1. Push the repo to GitHub and import it in Vercel — the Vite preset is
-   auto-detected (build: `npm run build`, output: `dist`).
-2. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` under
-   **Settings → Environment Variables** (Production + Preview).
-3. Deploy. The anon key is safe to expose: RLS is the actual security
-   boundary — anonymous users can only see unexpired rows.
+The repo ships with a `vercel.json` (framework: Vite, build: `npm run build`,
+output: `dist`), so a Vite preset is auto-detected either way.
+
+**Dashboard:** Add New → Project → import `rohitmane17/NeedItNow` → Deploy.
+With no `VITE_SUPABASE_*` variables set the site boots in **Demo data** mode,
+which is the expected default for a first deploy.
+
+**CLI:**
+
+```bash
+npx vercel login          # once, opens the browser
+npx vercel --prod --yes    # from the repo root
+```
+
+Or with a token from vercel.com/account/tokens:
+
+```bash
+npx vercel link --yes --project needitnow
+npx vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+```
+
+**After the first deploy**, add `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` under **Settings → Environment Variables**
+(Production + Preview) to switch from demo data to live Postgres, then
+redeploy. The anon key is safe to expose: RLS is the actual security
+boundary — anonymous users can only see unexpired rows.
