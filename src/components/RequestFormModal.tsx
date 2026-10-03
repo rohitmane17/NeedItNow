@@ -11,9 +11,9 @@ interface RequestFormModalProps {
 }
 
 const fieldClasses =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 transition hover:border-white/20 focus:border-indigo-400 focus:bg-white/10 focus:outline-none'
+  'w-full rounded-xl border border-white/10 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder:text-slate-500 transition focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
 
-const labelClasses = 'mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400'
+const labelClasses = 'mb-1.5 block text-xs font-medium text-slate-300'
 
 export function RequestFormModal({
   open,
@@ -23,40 +23,78 @@ export function RequestFormModal({
   onSubmit,
 }: RequestFormModalProps) {
   const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
   const [category, setCategory] = useState<Category>('Items')
-  const [location, setLocation] = useState('C-Block')
+  const [location, setLocation] = useState('')
+  const [description, setDescription] = useState('')
   const [contact, setContact] = useState('')
   const [touched, setTouched] = useState(false)
-  const titleRef = useRef<HTMLInputElement>(null)
 
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const onCloseRef = useRef(onClose)
+
+  const resetForm = () => {
+    setTitle('')
+    setLocation('')
+    setDescription('')
+    setContact('')
+    setTouched(false)
+  }
+
+  // Close = reset the draft, then hand control back to the parent.
+  const close = () => {
+    resetForm()
+    onClose()
+  }
+
+  // Track the latest onClose without widening the auto-focus effect below —
+  // the parent re-renders every second (ticking clock), so an inline
+  // `onClose` identity must never retrigger focus.
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  // ✅ Auto-focus ONLY once when the modal opens.
+  // CRITICAL: do NOT add title / location / description / contact to this
+  // dependency array — that is what caused focus to jump back to the first
+  // field while typing in the others. Form state is reset by `close()` /
+  // `resetForm()`, never inside this effect.
   useEffect(() => {
     if (!open) return
-    titleRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+
+    const focusTimer = window.setTimeout(() => titleInputRef.current?.focus(), 50)
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        resetForm()
+        onCloseRef.current()
+      }
     }
-    document.addEventListener('keydown', onKey)
+    const previousOverflow = document.body.style.overflow
+    document.addEventListener('keydown', handleKey)
     document.body.style.overflow = 'hidden'
+
     return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = ''
+      window.clearTimeout(focusTimer)
+      document.removeEventListener('keydown', handleKey)
+      document.body.style.overflow = previousOverflow
     }
-  }, [open, onClose])
+    // Deps intentionally `[open]` only — see comment above.
+  }, [open])
 
   if (!open) return null
 
   const errors = {
     title: title.trim().length < 4 ? 'Give it a clear title (at least 4 characters)' : '',
-    description: description.length > 400 ? 'Keep the description under 400 characters' : '',
+    location: location.trim() === '' ? 'Tell people where you need it' : '',
+    description: description.length > 400 ? 'Keep the details under 400 characters' : '',
     contact: contact.trim().length < 5 ? 'Add a way people can reach you' : '',
   }
-  const isValid = !errors.title && !errors.description && !errors.contact
+  const isValid = !errors.title && !errors.location && !errors.description && !errors.contact
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setTouched(true)
     if (!isValid || submitting) return
+
     try {
       await onSubmit({
         title: title.trim(),
@@ -65,63 +103,63 @@ export function RequestFormModal({
         location: location.trim(),
         contact_info: contact.trim(),
       })
+      // Parent closes the modal on success; clear the draft so the next
+      // post starts empty (belt and braces alongside `close()`).
+      resetForm()
     } catch {
-      // The parent surfaces the failure through `error`; keep the modal open
-      // so the student does not lose what they typed.
+      // Keep the modal open on failure so the student does not lose input.
       return
     }
-    setTitle('')
-    setDescription('')
-    setContact('')
-    setTouched(false)
   }
 
   const showError = (message: string) => (touched && message ? message : null)
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/80 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) close()
       }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-request-title"
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-slate-900 p-5 shadow-2xl shadow-black/50 sm:rounded-2xl"
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-slate-900 p-6 shadow-xl sm:rounded-2xl"
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 id="new-request-title" className="text-lg font-semibold text-white">
-              Post a request
+            <h2 id="new-request-title" className="text-xl font-bold text-white">
+              Post a Campus Request
             </h2>
             <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-400">
               <Clock className="size-3.5 text-indigo-300" aria-hidden />
-              It will disappear automatically 24 hours from now.
+              It expires automatically 24 hours from now.
             </p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close"
-            className="grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
           >
             <X className="size-4" aria-hidden />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {/* Title */}
           <div>
-            <label className={labelClasses} htmlFor="field-title">
-              What do you need?
+            <label htmlFor="req-title" className={labelClasses}>
+              What do you need? <span className="text-rose-400">*</span>
             </label>
             <input
-              id="field-title"
-              ref={titleRef}
+              id="req-title"
+              ref={titleInputRef}
+              type="text"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="e.g. Borrow a stapler for the C-Block desk"
+              placeholder="e.g., Scientific Calculator fx-991EX"
               maxLength={90}
               className={fieldClasses}
             />
@@ -130,17 +168,64 @@ export function RequestFormModal({
             ) : null}
           </div>
 
+          {/* Location (free text with campus suggestions) */}
           <div>
-            <label className={labelClasses} htmlFor="field-description">
-              Details <span className="normal-case text-slate-500">(optional)</span>
+            <label htmlFor="req-location" className={labelClasses}>
+              Where do you need it? <span className="text-rose-400">*</span>
+            </label>
+            <input
+              id="req-location"
+              type="text"
+              list="campus-locations"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="e.g., C-Block 3rd Floor / Library"
+              className={fieldClasses}
+            />
+            <datalist id="campus-locations">
+              {LOCATIONS.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+            {showError(errors.location) ? (
+              <p className="mt-1 text-xs text-rose-300">{errors.location}</p>
+            ) : null}
+            <p className="mt-1 text-[11px] text-slate-500">
+              Pick a campus spot so it matches the location filter.
+            </p>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label htmlFor="req-category" className={labelClasses}>
+              Category
+            </label>
+            <select
+              id="req-category"
+              value={category}
+              onChange={(event) => setCategory(event.target.value as Category)}
+              className={fieldClasses}
+            >
+              {CATEGORIES.map((option) => (
+                <option key={option} value={option} className="bg-slate-900">
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label htmlFor="req-desc" className={labelClasses}>
+              Details / Notes
             </label>
             <textarea
-              id="field-description"
+              id="req-desc"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
+              placeholder="Needed for today's practical exam till 2 PM…"
               rows={3}
               maxLength={400}
-              placeholder="When, where, and any deadline the helper should know about."
               className={`${fieldClasses} resize-none`}
             />
             <div className="mt-1 flex items-center justify-between">
@@ -155,53 +240,17 @@ export function RequestFormModal({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className={labelClasses} htmlFor="field-category">
-                Category
-              </label>
-              <select
-                id="field-category"
-                value={category}
-                onChange={(event) => setCategory(event.target.value as Category)}
-                className={fieldClasses}
-              >
-                {CATEGORIES.map((option) => (
-                  <option key={option} value={option} className="bg-slate-900">
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelClasses} htmlFor="field-location">
-                Location
-              </label>
-              <select
-                id="field-location"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                className={fieldClasses}
-              >
-                {LOCATIONS.map((option) => (
-                  <option key={option} value={option} className="bg-slate-900">
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
+          {/* Contact */}
           <div>
-            <label className={labelClasses} htmlFor="field-contact">
-              Contact info
+            <label htmlFor="req-contact" className={labelClasses}>
+              Contact Info <span className="text-rose-400">*</span>
             </label>
             <input
-              id="field-contact"
+              id="req-contact"
+              type="text"
               value={contact}
               onChange={(event) => setContact(event.target.value)}
-              placeholder="Phone / Telegram handle / WhatsApp link"
+              placeholder="Telegram handle or WhatsApp number"
               className={fieldClasses}
             />
             {showError(errors.contact) ? (
@@ -216,26 +265,27 @@ export function RequestFormModal({
             </p>
           ) : null}
 
-          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+          {/* Actions */}
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={onClose}
-              className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              onClick={close}
+              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-400 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
             >
               {submitting ? (
-                <>
+                <span className="inline-flex items-center gap-2">
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Posting…
-                </>
+                </span>
               ) : (
-                'Post for 24 hours'
+                'Post Request'
               )}
             </button>
           </div>
