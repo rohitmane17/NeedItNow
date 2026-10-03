@@ -80,21 +80,23 @@ export function RequestCard({ request, now, onClaim, claiming }: RequestCardProp
       {/* Expiry meter — PRN #7 rendered literally. */}
       <div className="mt-4 space-y-1.5">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-slate-500">Posted {formatPostedAt(request.created_at, now)}</span>
+          <span className="truncate text-slate-500">
+            Posted {formatPostedAt(request.created_at, now)}
+          </span>
           <span
             className={`inline-flex items-center gap-1 font-medium tabular-nums ${
               urgent ? 'text-rose-300' : 'text-slate-300'
             } ${ticking ? 'animate-pulse' : ''}`}
-            title="Time left before this request is deleted"
+            title="This request is deleted automatically 24 hours after it was posted"
           >
             <span className={`size-1.5 rounded-full ${urgent ? 'bg-rose-400' : 'bg-emerald-400'}`} />
-            {formatCountdown(msLeft)} left
+            Expires in {formatCountdown(msLeft)}
           </span>
         </div>
         <div
           className="h-1 w-full overflow-hidden rounded-full bg-white/10"
           role="progressbar"
-          aria-label="Lifetime used"
+          aria-label="Time remaining before this request is deleted automatically"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(progress * 100)}
