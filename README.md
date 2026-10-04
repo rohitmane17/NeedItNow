@@ -159,3 +159,141 @@ npx vercel deploy --prod --yes --token "$VERCEL_TOKEN"
 (Production + Preview) to switch from demo data to live Postgres, then
 redeploy. The anon key is safe to expose: RLS is the actual security
 boundary — anonymous users can only see unexpired rows.
+
+---
+
+# Submission write-up
+
+## 1. The Annoyance
+
+**What it is:** urgent, short-term campus needs get broadcast in massive
+WhatsApp, Telegram and personal group chats.
+
+**Who it annoys:** both sides. The student who needs help has their message
+buried under memes and chatter, and group members keep receiving pings for
+requests resolved hours ago.
+
+**How we know:** group chats fill with outdated requests — *"Need an HDMI cable
+for 2 PM presentation"* — that sit in feeds and search histories indefinitely.
+
+## 2. Our Constraint (PRN #7 — “Forgetful”)
+
+**Mandatory rule:** everything is deleted after 24 hours.
+
+**How it changed what we built:** rather than treating 24-hour deletion as a
+feature bolted onto a normal request board, we made ephemerality the organising
+principle of the whole product and enforced it in three independent tiers:
+
+| Tier | Mechanism |
+| --- | --- |
+| **UI** | A shared 1-second clock (`useNow`) drives a live countdown and a lifetime progress bar. `RequestCard` returns `null` the instant `expires_at` passes, so an expired card unmounts with no refetch. |
+| **API** | Every read issues `.gt('expires_at', now)` — `listRequests()` unconditionally, and `claimHelp()` re-checks before writing — so expired rows never cross the network. |
+| **Database** | Row Level Security (`USING (expires_at > NOW())`) is the real security boundary, backed by a `CHECK` constraint, a `BEFORE INSERT OR UPDATE` trigger, and `delete_expired_requests()` called on mount and every 60 seconds, with an optional `pg_cron` hourly backstop. |
+
+Why three tiers: the UI alone can be bypassed by anyone opening devtools; the
+query filter alone cannot stop a direct API call; RLS alone does not reclaim
+storage unless something actually deletes. Each covers the others' blind spot.
+
+## 3. The Great Part
+
+**What we picked:** live countdown badges, a single-click **“I’ll help”**
+action that reveals the poster’s contact handle, and a dual-mode data engine.
+
+**Why:** it keeps the interaction frictionless. During an urgent campus
+situation nobody wants to scroll a chat thread or create an account — post or
+offer help in under ten seconds, and the contact handle is one tap away
+(clipboard copy on every card).
+
+The dual-mode engine is the other part worth calling out: with
+`VITE_SUPABASE_*` set the app talks to Postgres; without them it falls back to
+a `localStorage` store that mirrors the same 24-hour rules. The header badge
+shows **Live** or **Demo data**, so the active mode is never ambiguous and the
+UI is fully usable before any credentials exist.
+
+## 4. The Two Testers
+
+Two manual walkthroughs on a fresh browser profile, covering what automation
+cannot judge. Full flow-by-flow matrix in [Two-user testing](#two-user-testing).
+
+**Tester 1 — first-year CS student.** The expiration timer read as a bare
+`22h 29m left`, which did not say what happens when it reaches zero — or even
+whether it counted down to expiry or up from posting.
+
+*What we changed* (`RequestCard.tsx`): the label is now **“Expires in …”**,
+carries a tooltip and an `aria-label` stating the request is deleted
+automatically 24 hours after it was posted, and the modal subtitle reads
+“It expires automatically 24 hours from now.” The empty state also explains
+*why* old requests vanish rather than just showing an empty board.
+
+**Tester 2 — third-year Mechanical student.** Tapping **“I’ll help”** gave no
+immediate feedback, so it was unclear whether the tap had registered.
+
+*What we changed* (`useRequests.ts`, `Toast.tsx`): the counter updates
+optimistically the instant it is tapped, with a snapshot rollback if the
+request expires mid-flight, and a toast confirms the result either way.
+
+## 5. AI Usage
+
+**What AI was used for:** scaffolding the initial React + TypeScript
+components, writing the Tailwind CSS v4 layout rules, and drafting the SQL
+migration scripts.
+
+**What AI got wrong — and how we caught it:** AI generated the request-form
+modal with an auto-focus effect whose dependency array included an inline
+`onClose` callback. Because the app re-renders every second to tick the expiry
+clock, that callback got a new identity every tick, so focus was yanked back
+to the title field roughly once per second while typing in any other field.
+
+The same root cause produced a second bug: the toast's auto-dismiss effect also
+depended on an inline callback, so its 4-second timer was cleared and re-armed
+every second and the toast **never dismissed at all**.
+
+Both are the kind of defect that type-checking and linting cannot catch. We
+found them by driving the built app in headless Chrome over the DevTools
+Protocol — posting a request and asserting the toast was gone after 4s, and
+typing into the location field and asserting focus was retained across 2.6
+seconds of ticking re-renders. Both now pass. The fix in each case is the same
+pattern: read the callback through a **ref** and narrow the effect's dependency
+array to the value that should actually retrigger it.
+
+## 6. Not Done
+
+- **In-app chat.** Omitted deliberately in favour of direct contact handles
+  (Telegram / WhatsApp) — a message thread inside the app would recreate the
+  clutter the product exists to remove.
+- **User accounts.** Omitted to keep posting anonymous and frictionless. This
+  has a real cost: there is no ownership column, so with RLS as written any
+  anonymous client may `UPDATE` any request's title, contact info or
+  `helper_count`. Adding auth would close that.
+- **Map view.** Replaced with standardized location tags for VIT Pune landmarks
+  (A-Block, Library, Main Gate, Hostel, …) via a `<datalist>` of suggestions
+  plus a filter dropdown.
+- **Live database verification.** `supabase/migrations/0001_init.sql` has been
+  written and reviewed but not yet executed against a live Supabase project, so
+  the tier-3 guarantees above are implemented but unproven on real
+  infrastructure. The deployment currently runs in Demo data mode.
+
+## 7. Running Locally
+
+```bash
+git clone https://github.com/rohitmane17/NeedItNow.git
+cd NeedItNow
+npm install
+```
+
+Set up your local environment file (`.env.local`):
+
+```
+VITE_SUPABASE_URL=https://<project-id>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon public key>
+```
+
+If these are omitted the app automatically runs in **Demo data** mode against a
+seeded `localStorage` store that enforces the same 24-hour rules — the full UI
+is usable with no backend.
+
+Run the development server:
+
+```bash
+npm run dev
+```
